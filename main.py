@@ -76,18 +76,12 @@ def main():
                 content=f"{instructions}"
             )
 
-            manager.run_assistant(instructions="Follow the user's instructions")
-
             # Wait for completion and process messages
-            manager.wait_for_completion()
+            manager.wait_for_completion(st)
 
             summary = manager.get_summary()
 
             st.write(summary)
-
-            st.text("Run steps:")
-
-            st.code(manager.run_steps(), line_numbers=True)
 
 
 if __name__ == "__main__":

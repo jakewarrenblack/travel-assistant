@@ -3,10 +3,10 @@ import requests
 from datetime import date
 import json
 
-kiwi_api_key = os.environ.get("KIWI_API_KEY")
-
 
 def get_flights(flyFrom, flyTo, dateFrom=None, dateTo=None):
+    kiwi_api_key = os.environ.get("KIWI_API_KEY")
+
     # If no dateFrom is provided, use today's date as the starting point
     if not dateFrom:
         dateFrom = date.today()

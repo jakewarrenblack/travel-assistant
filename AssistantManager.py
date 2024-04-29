@@ -1,6 +1,8 @@
 import time
 import openai
 import json
+
+from EventHandler import EventHandler
 from get_flights import get_flights
 
 # I may switch this to GPT-4 at some point,
@@ -9,8 +11,8 @@ model = "gpt-3.5-turbo-16k"
 
 
 class AssistantManager:
-    thread_id = "thread_VscIuPp7RinEr5Zqed9HXUiF"
-    assistant_id = "asst_mMItjPckIcHQ3Zc5iU7OD9Qe"
+    thread_id = "thread_bG7ee22hatGA5BKCZOgPYV0x"
+    assistant_id = "asst_tFQbjwc0qRlJp5nt6Z8Bjar7"
 
     def __init__(self):
         self.client = openai.OpenAI()
@@ -34,6 +36,21 @@ class AssistantManager:
                 thread_id=self.thread_id
             )
 
+    def list_runs(self):
+        runs = self.client.beta.threads.runs.list(
+            self.thread.id
+        )
+
+        print("List of runs: ", runs)
+
+        for run in runs:
+            # Not allowed to cancel an expired, completed etc run
+            if run.status == "queued" or run.status == "in_progress" or run.status == "requires_action":
+                self.client.beta.threads.runs.cancel(
+                    thread_id=self.thread.id,
+                    run_id=run.id
+                )
+
     def create_assistant(self, name, instructions, tools):
         if not self.assistant:
             assistant_obj = self.client.beta.assistants.create(
@@ -46,6 +63,10 @@ class AssistantManager:
             self.assistant_id = assistant_obj.id
             self.assistant = assistant_obj
             print(f"Assistant ID: {self.assistant.id}")
+
+        else:
+            self.list_runs()
+            return
 
     def create_thread(self):
         if not self.thread:
@@ -66,6 +87,7 @@ class AssistantManager:
 
     def run_assistant(self, instructions):
         if self.thread and self.assistant:
+            # At this point, we can override the tools made available at the assistant creation level if need be
             self.run = self.client.beta.threads.runs.create(
                 thread_id=self.thread.id,
                 assistant_id=self.assistant.id,
@@ -89,74 +111,22 @@ class AssistantManager:
             self.summary = "\n".join(summary)
             print(f"Summary: {role.capitalize()}: ==> {response}")
 
-    def call_required_functions(self, required_actions):
-        if not self.run:
-            return
-        tool_outputs = []
-
-        for action in required_actions["tool_calls"]:
-            func_name = action["function"]["name"]
-            arguments = json.loads(action["function"]["arguments"])
-
-            if func_name == "get_flights":
-                output = get_flights(flyFrom=arguments["flyFrom"], flyTo=arguments["flyTo"])
-                print(f"OUTPUT FROM GET FLIGHTS CALL: {output}")
-
-                output_str = ""
-
-                for item in output:
-                    output_str += "".join(item)
-
-                tool_outputs.append({"tool_call_id": action["id"], "output": output_str})
-
-
-
-            else:
-                raise ValueError(f"Unknown function: {func_name}")
-
-        print("Sending outputs back to the assistant...")
-        self.client.beta.threads.runs.submit_tool_outputs(
-            thread_id=self.thread.id,
-            run_id=self.run.id,
-            tool_outputs=tool_outputs
-        )
+    #     self.client.beta.threads.runs.submit_tool_outputs(
+    #         thread_id=self.thread.id,
+    #         run_id=self.run.id,
+    #         tool_outputs=tool_outputs
+    #     )
 
     def get_summary(self):
         return self.summary
 
-    def wait_for_completion(self):
-        # When a run is invoked, the steps the assistant goes through can take some time,
-        # So we need a helper to wait until it's done
-        if self.thread and self.run:
-            while True:
-                time.sleep(5)
-                run_status = self.client.beta.threads.runs.retrieve(
-                    thread_id=self.thread.id,
-                    run_id=self.run.id,
-                )
+    def wait_for_completion(self, st):
 
-                # generate a JSON representation of the model
-                print(f"Run status: {run_status.model_dump_json(indent=4)}")
+        with self.client.beta.threads.runs.stream(
+                thread_id=self.thread.id,
+                assistant_id=self.assistant.id,
+                event_handler=EventHandler(client=self.client, st=st)
+        ) as stream:
+            stream.until_done()
 
-                if run_status.status == "completed":
-                    self.process_messages()
-                    break
-
-                # When the status says some action is required, figure out what function we need to run
-                # And call that function, an external tool (which is e.g. our flights function)
-                elif run_status.status == "requires_action":
-                    print("FUNCTION CALLING HAPPENING...")
-                    self.call_required_functions(
-                        required_actions=run_status.required_action.submit_tool_outputs.model_dump()
-                    )
-
-    def run_steps(self):
-        # Go through all the run steps, retrieve info
-        run_steps = self.client.beta.threads.runs.steps.list(
-            thread_id=self.thread.id,
-            run_id=self.run.id,
-        )
-
-        print(f"Run-Steps: {run_steps}")
-
-        return run_steps.data
+            self.summary = stream
