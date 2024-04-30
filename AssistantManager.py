@@ -120,13 +120,13 @@ class AssistantManager:
     def get_summary(self):
         return self.summary
 
-    def wait_for_completion(self, st):
+    def wait_for_completion(self, socketio):
 
         with self.client.beta.threads.runs.stream(
                 thread_id=self.thread.id,
                 assistant_id=self.assistant.id,
-                event_handler=EventHandler(client=self.client, st=st)
+                event_handler=EventHandler(client=self.client, socketio=socketio)
         ) as stream:
             stream.until_done()
 
-            self.summary = stream
+            #self.summary = stream

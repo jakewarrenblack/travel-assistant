@@ -1,16 +1,19 @@
+import time
+
 import streamlit
 from openai import AssistantEventHandler
 from typing_extensions import dataclass_transform
 import json
+from streamlit import write_stream
 from get_flights import get_flights
 
 
 class EventHandler(AssistantEventHandler):
 
-    def __init__(self, client=None, st=None):
+    def __init__(self, client=None, socketio=None):
         super().__init__()
         self.client = client
-        self.st = st
+        self.socketio = socketio
 
     @dataclass_transform()
     def on_event(self, event):
@@ -43,7 +46,7 @@ class EventHandler(AssistantEventHandler):
         # Submit all tool_outputs at the same time
         # wrap in write_stream to write text chunks to the UI in a typewriter style
         # saw this here: https://community.openai.com/t/asynchronously-stream-openai-gpt-outputs-streamlit-app/612793
-        self.st.write_stream(self.submit_tool_outputs(tool_outputs, run_id))
+        self.submit_tool_outputs(tool_outputs, run_id)
 
     def submit_tool_outputs(self, tool_outputs, run_id):
         # Use the submit_tool_outputs_stream helper
@@ -54,14 +57,7 @@ class EventHandler(AssistantEventHandler):
                 event_handler=EventHandler(),
         ) as stream:
             for text in stream.text_deltas:
-
-                yield text
-
-                #print(text, end="", flush=True)
-
-            #print()
-
-
-
-
-
+                print('Sending this text to frontend: ', text)
+                self.socketio.emit('message_to_frontend', text, namespace='/')
+                #time.sleep(1)
+                #self.socketio.sleep(0)  # Flush the data
