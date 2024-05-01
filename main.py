@@ -13,13 +13,9 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
 
-import streamlit as st
-
-st.write_stream
 
 @socketio.on('message_from_frontend')
 def handle_message(message):
-
     print('message from client: ', message)
 
     manager.add_message_to_thread(
@@ -28,12 +24,12 @@ def handle_message(message):
     )
 
     # Wait for completion and process messages, the EventManager will look after running any necessary functions
-    # We pass the socketio instance here, so we can emit the assistant's response to the frontend
-    manager.wait_for_completion(socketio)
+    manager.wait_for_completion()
 
 
 if __name__ == "__main__":
-    manager = AssistantManager()
+    # We pass the socketio instance here, so we can emit the assistant's response to the frontend
+    manager = AssistantManager(socketio=socketio)
 
     manager.create_assistant(
         name="Travel helper",
@@ -74,10 +70,58 @@ if __name__ == "__main__":
                     },
                     "required": ["flyFrom", "flyTo"]
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_hotels",
+                    "description": "Search for a given query on TripAdvisor. This can be a search for hotels, "
+                                   "restaurants, or attractions for a given area. The parameters are the search query "
+                                   "and the category of the search query, where the category can be 'hotels', "
+                                   "'restaurants', or 'attractions', and the search query is the text to use for "
+                                   "searching based on the name of the location, such as 'Malaga'",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "search_query": {
+                                "type": "string",
+                                "description": "The search query to search for on TripAdvisor, which is the text to "
+                                               "use for searching based on the name of the location, such as 'Malaga'"
+                            },
+                            "category": {
+                                "type": "string",
+                                "description": "The category of the search query, which can be 'hotels', "
+                                               "'restaurants', or 'attractions'"
+                            }
+                        }
+                    },
+                    "required": ["search_query", "category"]
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "tripadvisor_location_details",
+                    "description": "Get the details of a location on TripAdvisor. This can be a location such as a "
+                                   "hotel, restaurant, or attraction. The parameters are the location ID, which will "
+                                   "have been obtained from a previous search, and the category of the location, "
+                                   "where the category can be 'hotels', 'restaurants', or 'attractions'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location_id": {
+                                "type": "string",
+                                "description": "The location ID to get the details of, which will have been obtained "
+                                               "from the results of a request to the tripadvisor_search function"
+                            },
+                        }
+                    },
+                    "required": ["location_id"]
+                }
             }
         ]
     )
 
     manager.create_thread()
 
-    socketio.run(app)
+    socketio.run(app, allow_unsafe_werkzeug=True)

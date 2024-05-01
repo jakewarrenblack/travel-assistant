@@ -14,7 +14,7 @@ class AssistantManager:
     thread_id = "thread_bG7ee22hatGA5BKCZOgPYV0x"
     assistant_id = "asst_tFQbjwc0qRlJp5nt6Z8Bjar7"
 
-    def __init__(self):
+    def __init__(self, socketio):
         self.client = openai.OpenAI()
         self.model = model
         self.assistant = None
@@ -22,6 +22,9 @@ class AssistantManager:
         self.run = None
         self.flights = None
         self.summary = None
+        self.socketio = socketio
+
+        self.event_handler = EventHandler(client=self.client, socketio=self.socketio)
 
         # If assistant id already exists, set the assistant object to use that assistant
         # Instead of creating a new one
@@ -120,13 +123,11 @@ class AssistantManager:
     def get_summary(self):
         return self.summary
 
-    def wait_for_completion(self, socketio):
+    def wait_for_completion(self):
 
         with self.client.beta.threads.runs.stream(
                 thread_id=self.thread.id,
                 assistant_id=self.assistant.id,
-                event_handler=EventHandler(client=self.client, socketio=socketio)
+                event_handler=EventHandler(self.client, self.socketio)
         ) as stream:
             stream.until_done()
-
-            #self.summary = stream
