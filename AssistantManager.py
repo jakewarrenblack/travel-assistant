@@ -12,10 +12,11 @@ model = "gpt-3.5-turbo-16k"
 
 class AssistantManager:
     thread_id = "thread_bG7ee22hatGA5BKCZOgPYV0x"
-    assistant_id = "asst_tFQbjwc0qRlJp5nt6Z8Bjar7"
+    assistant_id = "asst_wzNs7ohd2vKiOpcLQveZrOGn"
 
     def __init__(self, socketio):
         self.client = openai.OpenAI()
+        self.assistant_id = None
         self.model = model
         self.assistant = None
         self.thread = None
@@ -28,7 +29,7 @@ class AssistantManager:
 
         # If assistant id already exists, set the assistant object to use that assistant
         # Instead of creating a new one
-        if AssistantManager.assistant_id:
+        if self.assistant_id:
             self.assistant = self.client.beta.assistants.retrieve(
                 assistant_id=self.assistant_id
             )
@@ -71,6 +72,8 @@ class AssistantManager:
             self.list_runs()
             return
 
+        print("Assistant ID ", self.assistant_id)
+
     def create_thread(self):
         if not self.thread:
             thread_obj = self.client.beta.threads.create()  # no params
@@ -80,6 +83,8 @@ class AssistantManager:
             print(f"Thread ID: {self.thread.id}")
 
     def add_message_to_thread(self, role, content):
+        self.list_runs()
+
         # Obviously, we need a thread ID to be able to add a message
         if self.thread:
             self.client.beta.threads.messages.create(

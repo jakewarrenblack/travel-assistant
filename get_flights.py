@@ -2,27 +2,35 @@ import os
 import requests
 from datetime import date
 import json
+from dateutil import parser
 
 
 def get_flights(flyFrom, flyTo, dateFrom=None, dateTo=None):
     kiwi_api_key = os.environ.get("KIWI_API_KEY")
 
+    # always set the dateFrom and dateTo to None if not provided
+
+
     # If no dateFrom is provided, use today's date as the starting point
     if not dateFrom:
         dateFrom = date.today()
-
         # tequila api expects dd/mm/yyyy
         dateFromFormatted = dateFrom.strftime("%d/%m/%Y")
 
+    if not dateTo:
+        # Let's just say the user wants to fly within the next year
+        dateTo = date.today().replace(year=date.today().year + 1)
+
     if dateTo:
-        dateToFormatted = dateTo.strftime("%d/%m/%Y")
+        dateTo_object = parser.parse(dateTo)
+        dateToFormatted = dateTo_object.strftime("%d/%m/%Y")
+
+    if dateFrom:
+        dateFrom_object = parser.parse(dateTo)
+        dateFromFormatted = dateFrom_object.strftime("%d/%m/%Y")
 
     # apiKey = ***REMOVED*** to be passed in headers
-    url = f'https://api.tequila.kiwi.com/v2/search?flyFrom={flyFrom}&to={flyTo}&dateFrom={dateFromFormatted}'
-
-    # If no end date is provided, the API will just return all flights as far as it has info on
-    if dateTo:
-        url = f'https://api.tequila.kiwi.com/v2/search?flyFrom={flyFrom}&to={flyTo}&dateFrom={dateFromFormatted}&dateTo={dateToFormatted}'
+    url = f'https://api.tequila.kiwi.com/v2/search?flyFrom={flyFrom}&to={flyTo}&dateFrom={dateFromFormatted}&dateTo={dateToFormatted}'
 
     try:
         response = requests.get(url, headers={

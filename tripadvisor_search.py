@@ -5,7 +5,7 @@ import json
 
 
 def tripadvisor_search(search_query=None, category=None):
-    tripadvisor_api_key = os.environ.get("TRIPADIVSOR_API_KEY")
+    tripadvisor_api_key = os.environ.get("TRIPADVISOR_API_KEY")
 
     # searchQuery = text to use for searching based on the NAME of the location,
     # so e.g. "Malaga", but category could be "hotels", or "attractions", or "restaurants"
@@ -53,8 +53,8 @@ def tripadvisor_search(search_query=None, category=None):
             for location in locations:
                 location_id = location["location_id"]
                 name = location["name"]
-                city = location["city"]
-                country = location["country"]
+                city = location["address_obj"]["city"]
+                country = location["address_obj"]["country"]
 
                 info = f"""
                     LocationID: {location_id},
@@ -75,7 +75,7 @@ def tripadvisor_search(search_query=None, category=None):
 
 
 def tripadvisor_location_details(location_id=None):
-    tripadvisor_api_key = os.environ.get("TRIPADIVSOR_API_KEY")
+    tripadvisor_api_key = os.environ.get("TRIPADVISOR_API_KEY")
 
     url = (f"https://api.content.tripadvisor.com/api/v1/location/"
            f"{location_id}/details"
@@ -89,9 +89,7 @@ def tripadvisor_location_details(location_id=None):
 
         if response.status_code == 200:
             res = json.dumps(response.json(), indent=4)
-            res_json = json.loads(res)['data']
-
-            locations = res_json
+            location = json.loads(res)
 
             concatenated_location_info = []
 
@@ -223,66 +221,132 @@ def tripadvisor_location_details(location_id=None):
             }
             '''
 
-            for location in locations:
-                location_id = location["location_id"]
-                name = location["name"]
-                description = location["description"]
-                web_url = location["web_url"]
+            location_id = location["location_id"]
+            name = location["name"]
+            description = location["description"]
+            web_url = location["web_url"]
 
-                # E.g #12 out of 121 hotels in Malaga
-                ranking_string = location["ranking_data"]["ranking_string"]
+            # E.g #12 out of 121 hotels in Malaga
+            ranking_string = location["ranking_data"]["ranking_string"]
 
-                # in stars, e.g. 4.5
-                rating = location["rating"]
-                num_reviews = location["num_reviews"]
+            # in stars, e.g. 4.5
+            rating = location["rating"]
+            num_reviews = location["num_reviews"]
 
-                '''        
-                this is an object containing ratings for specific attributes, e.g 'rate_location'                    
-                so each object would have:
-                name(e.g rate_sleep)
-                rating_value (e.g 4.5)
-                '''
+            '''        
+            this is an object containing ratings for specific attributes, e.g 'rate_location'                    
+            so each object would have:
+            name(e.g rate_sleep)
+            rating_value (e.g 4.5)
+            '''
 
-                subratings = location["subratings"]
-                subrating_info = []
+            subratings = location["subratings"]
+            subrating_info = []
 
-                for detail in subratings:
-                    subrating_name = subratings[detail]["localized_name"]
-                    subrating_value = subratings[detail]["value"]
+            for detail in subratings:
+                subrating_name = subratings[detail]["localized_name"]
+                subrating_value = subratings[detail]["value"]
 
-                    subrating_info.append(f"{subrating_name}: {subrating_value}")
+                subrating_info.append(f"{subrating_name}: {subrating_value}")
 
-                    # Given in dollar signs, e.g. $$$, max is $$$$
-                # So $ is the cheapest, $$$$ is the most expensive
-                price_level = location["price_level"]
+                # Given in dollar signs, e.g. $$$, max is $$$$
+            # So $ is the cheapest, $$$$ is the most expensive
+            price_level = location["price_level"]
 
-                # Array containing e.g. ["Free Internet", "Wifi", "Free Wifi", "Suites", "Public Wifi",
-                # "Air conditioning"]
-                amenities = location["amenities"]  # array
+            # Array containing e.g. ["Free Internet", "Wifi", "Free Wifi", "Suites", "Public Wifi",
+            # "Air conditioning"]
+            amenities = location["amenities"]  # array
 
-                # This is an array of objects Each object has: name -> e.g business, solo, couples, friends value ->
-                # e.g 671, 285, 2568, 645 -> this is the number of recommendations given for each type,
-                # so if the highest number is for 'couples', then this location is most recommended for couples
-                trip_types = location["trip_types"]
+            # This is an array of objects Each object has: name -> e.g business, solo, couples, friends value ->
+            # e.g 671, 285, 2568, 645 -> this is the number of recommendations given for each type,
+            # so if the highest number is for 'couples', then this location is most recommended for couples
+            trip_types = location["trip_types"]
 
-                trip_type_info = []
+            trip_type_info = []
 
-                for trip_type in trip_types:
+            for trip_type in trip_types:
+                # if trip type is string, split it by colon
+                if isinstance(trip_type, str):
+                    trip_type_list = trip_type.split(":")
+
+                    trip_type_name = trip_type_list[0]
+                    trip_type_value = trip_type_list[1]
+                elif isinstance(trip_type, dict):
                     trip_type_name = trip_type["name"]
                     trip_type_value = trip_type["value"]
+                else:
+                    trip_type_name = "Unknown"
+                    trip_type_value = "Unknown"
 
-                    concat_trip_type = f"{trip_type_name}: {trip_type_value}"
-                    trip_types.append(concat_trip_type)
+                concat_trip_type = f"{trip_type_name}: {trip_type_value}"
+                trip_type_info.append(concat_trip_type)
 
-                # For subratings
-                subrating_info_str = ', '.join(subrating_info)
+            # For subratings
+            subrating_info_str = ', '.join(subrating_info)
 
-                # For amenities
-                amenities_str = ', '.join(amenities)
+            # For amenities
+            amenities_str = ', '.join(amenities)
 
-                # For trip_types
-                trip_type_info_str = ', '.join(trip_type_info)
+            # For trip_types
+            trip_type_info_str = ', '.join(trip_type_info)
 
+            # cuisine and features are specific to restaurants
+
+            # "cuisine": [
+            #     {
+            #         "name": "mediterranean",
+            #         "localized_name": "Mediterranean"
+            #     },
+            #     {
+            #         "name": "european",
+            #         "localized_name": "European"
+            #     },
+            #     {
+            #         "name": "spanish",
+            #         "localized_name": "Spanish"
+            #     },
+            #     {
+            #         "name": "contemporary",
+            #         "localized_name": "Contemporary"
+            #     }
+            # ],
+
+            # "features": [
+            #     "Accepts Credit Cards",
+            #     "Gift Cards Available",
+            #     "Highchairs Available",
+            #     "Outdoor Seating",
+            #     "Reservations",
+            #     "Seating",
+            #     "Serves Alcohol",
+            #     "Table Service",
+            #     "Wheelchair Accessible"
+            # ],
+
+            cuisine_info = []
+            if location["cuisine"]:
+
+                cuisine = location["cuisine"]
+
+                for cuisine_type in cuisine:
+                    cuisine_name = cuisine_type["name"]
+                    cuisine_info.append(cuisine_name)
+
+            cuisine_info_str = ', '.join(cuisine_info)
+
+            features_info = []
+            if location["features"]:
+
+                features = location["features"]
+
+                for feature in features:
+                    feature_name = feature
+                    features_info.append(feature_name)
+
+            features_info_str = ', '.join(features_info)
+
+            # We're dealing with a restaurant
+            if len(cuisine_info) > 0:
                 info = f"""
                     LocationID: {location_id},
                     Name: {name},
@@ -292,10 +356,26 @@ def tripadvisor_location_details(location_id=None):
                     Subratings: {subrating_info_str},
                     Amenities: {amenities_str},
                     Recommended for these types: {trip_type_info_str},
-                    Web URL: {web_url},                    
+                    Web URL: {web_url}, 
+                    Price level: {price_level}        
+                    Cuisine: {cuisine_info_str},
+                    Features: {features_info_str}           
+                """
+            else:
+                info = f"""
+                    LocationID: {location_id},
+                    Name: {name},
+                    Description: {description},
+                    Ranking: {ranking_string}
+                    Rating: f"{rating} stars, based on {num_reviews} reviews"
+                    Subratings: {subrating_info_str},
+                    Amenities: {amenities_str},
+                    Recommended for these types: {trip_type_info_str},
+                    Web URL: {web_url}, 
+                    Price level: {price_level}                   
                 """
 
-                concatenated_location_info.append(info)
+            concatenated_location_info.append(info)
 
             return concatenated_location_info
 

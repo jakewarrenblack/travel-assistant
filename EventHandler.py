@@ -56,7 +56,14 @@ class EventHandler(AssistantEventHandler):
 
 
                 # submit_tool_outputs_stream (or just submit_tool_outputs) expects an object with the output in the form of a string
-                output = get_flights(flyFrom=args["flyFrom"], flyTo=args["flyTo"])
+
+                if "dateFrom" not in args:
+                    args["dateFrom"] = None
+
+                if "dateTo" not in args:
+                    args["dateTo"] = None
+
+                output = get_flights(flyFrom=args["flyFrom"], flyTo=args["flyTo"], dateFrom=args["dateFrom"], dateTo=args["dateTo"])
                 output_str = ""
 
                 for item in output:
@@ -66,6 +73,13 @@ class EventHandler(AssistantEventHandler):
 
             elif tool.function.name == "tripadvisor_search":
                 args = json.loads(tool.function.arguments)
+
+                # The LLM makes assumptions about what the function name should be, or what the parameters should be
+                # The argument is really called search_query, but the LLM assumes it's called destination
+                if "destination" in args:
+                    args["search_query"] = args["destination"]
+                    del args["destination"]
+
 
                 output = tripadvisor_search(search_query=args["search_query"], category=args["category"])
                 output_str = ""
@@ -82,6 +96,8 @@ class EventHandler(AssistantEventHandler):
 
                 for item in output:
                     output_str += "".join(item)
+
+                tool_outputs.append({"tool_call_id": tool.id, "output": output_str})
 
         # Submit all tool_outputs at the same time
         # wrap in write_stream to write text chunks to the UI in a typewriter style
