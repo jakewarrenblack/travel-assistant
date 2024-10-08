@@ -29,7 +29,7 @@ def get_flights(flyFrom, flyTo, dateFrom=None, dateTo=None):
         dateFrom_object = parser.parse(dateTo)
         dateFromFormatted = dateFrom_object.strftime("%d/%m/%Y")
 
-    # apiKey = ***REMOVED*** to be passed in headers
+    # apiKey to be passed in headers
     url = f'https://api.tequila.kiwi.com/v2/search?flyFrom={flyFrom}&to={flyTo}&dateFrom={dateFromFormatted}&dateTo={dateToFormatted}'
 
     try:
